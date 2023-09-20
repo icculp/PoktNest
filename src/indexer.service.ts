@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/return-await */
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { type FindOneOptions, Repository } from 'typeorm'
 import axios from 'axios'
 import { Block } from './entities/block.entity'
@@ -8,6 +10,7 @@ import { Transaction } from './entities/transaction.entity'
 import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule'
 import { MyLogger } from './my-logger.service'
 import * as retry from 'async-retry'
+
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require('dotenv').config();
@@ -20,6 +23,7 @@ const BACKOFF = 1.1
 export class IndexerService {
   private readonly logger = new MyLogger(IndexerService.name)
   private verificationMode: boolean = false
+  // private blockProcessingQueue: Queue;
   // schedulerRegistry: any;
 
   constructor (
@@ -27,8 +31,11 @@ export class IndexerService {
     private readonly blockRepository: Repository<Block>,
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
-    private readonly schedulerRegistry: SchedulerRegistry
-  ) {}
+    private readonly schedulerRegistry: SchedulerRegistry,
+    @InjectQueue('blockProcessing') private blockQueue: Queue
+  ) {
+    // this.blockProcessingQueue = new Queue('blockProcessing');
+  }
 
   async getHeight () {
     const headers = {
@@ -389,54 +396,64 @@ export class IndexerService {
     // const heights = Array.from({ length: end - start + 1 }, (_, i) => start + i);
     // start at latest and work backwards
     const heights = Array.from({ length: end - start + 1 }, (_, i) => end - i)
+
+    // for (const height of heights) {
+    //   await this.blockQueue.add('processBlock', height);
+    // }
+
     const chunks = []
     concurrency = 30 // set to 1 to disable concurrency
     for (let i = 0; i < heights.length; i += concurrency) {
       chunks.push(heights.slice(i, i + concurrency))
     }
 
-    const allBlocks: Block[] = []
-    const allTransactions: any[] = []
+    // const allBlocks: Block[] = []
+    // const allTransactions: any[] = []
     for (const chunk of chunks) {
-      this.logger.log(`Processing block heights: ${chunk[0]} to ${chunk[chunk.length - 1]}`)
+      // this.logger.log(`Processing block heights: ${chunk[0]} to ${chunk[chunk.length - 1]}`)
 
-      const processedData = await Promise.all(chunk.map(async height => {
-        const existsAndComplete = await this.blockExistsAndComplete(height)
-        if (!existsAndComplete || this.verificationMode) {
-          return await this.syncBlock(height)
-        } else {
-          this.logger.log(`Block ${height} already exists ...`)
-          return null
-        }
-      }))
-
-      // Filter out null results
-      const validData = processedData.filter(data => data !== null)
-
-      // Add to allBlocks and allTransactions
-      allBlocks.push(...validData.map(data => data.block))
-      allTransactions.push(...[].concat(...validData.map(data => data.transactions)))
-      this.logger.log(`blocks: ${allBlocks.length}, transactions: ${allTransactions.length}`)
-      // Save if transactions count exceed a certain limit or at the end of each chunk
-      //
-      if (allTransactions.length >= 100000) {
-        this.logger.log(`Saving blocks and transactions, blocks: ${allBlocks.length}, transactions: ${allTransactions.length}`)
-        await this.blockRepository.save(allBlocks, { chunk: 100 })
-        await this.transactionRepository.save(allTransactions, { chunk: 500 })
-
-        // Clear saved blocks and transactions
-        allBlocks.length = 0
-        allTransactions.length = 0
-      }
+      await Promise.allSettled(chunk.map(async height => {
+        await this.blockQueue.add('processBlock', height);
+      }));
     }
+    //     const existsAndComplete = await this.blockExistsAndComplete(height)
+    //     if (!existsAndComplete || this.verificationMode) {
+    //       return await this.syncBlock(height)
+    //     } else {
+    //       this.logger.log(`Block ${height} already exists ...`)
+    //       return null
+    //     }
+    //   }))
 
-    // Save any remaining blocks and transactions after loop completes
-    if (allBlocks.length > 0) {
-      await this.blockRepository.save(allBlocks, { chunk: 100 })
-    }
-    if (allTransactions.length > 0) {
-      await this.transactionRepository.save(allTransactions, { chunk: 4000 })
-    }
+    //   // Filter out null results
+    //   const validData = processedData
+    //     .filter(data => data.status === 'fulfilled' && data.value !== null)
+    //     .map(data => (data as PromiseFulfilledResult<any>).value)
+
+    //   // Add to allBlocks and allTransactions
+    //   allBlocks.push(...validData.map(data => data.block))
+    //   allTransactions.push(...[].concat(...validData.map(data => data.transactions)))
+    //   this.logger.log(`blocks: ${allBlocks.length}, transactions: ${allTransactions.length}`)
+    //   // Save if transactions count exceed a certain limit or at the end of each chunk
+    //   //
+    //   if (allTransactions.length >= 100000) {
+    //     this.logger.log(`Saving blocks and transactions, blocks: ${allBlocks.length}, transactions: ${allTransactions.length}`)
+    //     await this.blockRepository.save(allBlocks, { chunk: 100 })
+    //     await this.transactionRepository.save(allTransactions, { chunk: 500 })
+
+    //     // Clear saved blocks and transactions
+    //     allBlocks.length = 0
+    //     allTransactions.length = 0
+    //   }
+    // }
+
+    // // Save any remaining blocks and transactions after loop completes
+    // if (allBlocks.length > 0) {
+    //   await this.blockRepository.save(allBlocks, { chunk: 100 })
+    // }
+    // if (allTransactions.length > 0) {
+    //   await this.transactionRepository.save(allTransactions, { chunk: 4000 })
+    // }
   }
   // }
 
@@ -477,7 +494,7 @@ export class IndexerService {
     const height = await this.getHeight()
 
     // const useConcurrency = true; // Set this to false if you don't want concurrency
-    const firstLevelConcurrencyLimit: number = 20 // Number of blocks to process concurrently, set to 0 to disable as transactions can run concurrently and multiple levels might be too much
+    const firstLevelConcurrencyLimit: number = 200 // Number of blocks to process concurrently, set to 0 to disable as transactions can run concurrently and multiple levels might be too much
 
     if (firstLevelConcurrencyLimit !== 0) {
       await this.processBlocksConcurrently(0, height, firstLevelConcurrencyLimit)
