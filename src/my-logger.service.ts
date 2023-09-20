@@ -1,5 +1,5 @@
 import { ConsoleLogger, Logger } from '@nestjs/common';
-import { createWriteStream, WriteStream } from 'fs';
+import { createWriteStream, type WriteStream } from 'fs';
 
 // const options = {
 //   timeZone: 'America/Chicago',

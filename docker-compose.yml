@@ -4,6 +4,7 @@ services:
   postgres:
     container_name: postgres
     image: postgres:latest
+      #user: postgres
     shm_size: '16gb'
     deploy:
         resources:
@@ -17,7 +18,7 @@ services:
       - .env
     volumes:
       - ./postgres:/docker-entrypoint-initdb.d
-      - ~/indexer:/data:z # chown -R 999:999 ~/indexer
+      - ~/indexer:/data # chown -R 999:999 ~/indexer
       - ./postgres/pg_hba.conf:/config/pg_hba.conf
       - ./postgres/postgresql.conf:/config/postgresql.conf
     command:
