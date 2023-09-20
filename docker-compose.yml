@@ -1,0 +1,40 @@
+version: '3.7'
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    shm_size: '16gb'
+    deploy:
+        resources:
+            limits:
+              cpus: "16"
+            reservations:
+              cpus: "8"
+    ports:
+      - "3432:3432"
+    env_file:
+      - .env
+    volumes:
+      - ./postgres:/docker-entrypoint-initdb.d
+      - ~/indexer:/data:z # chown -R 999:999 ~/indexer
+      - ./postgres/pg_hba.conf:/config/pg_hba.conf
+      - ./postgres/postgresql.conf:/config/postgresql.conf
+    command:
+      - postgres
+      - -c
+      - config_file=/config/postgresql.conf
+    networks:
+      indexer:
+        ipv4_address: 192.168.111.3
+
+volumes:
+  indexer_volume:
+
+networks:
+  indexer:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "192.168.111.0/24"
