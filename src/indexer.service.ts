@@ -402,7 +402,7 @@ export class IndexerService {
     // }
 
     const chunks = []
-    concurrency = 30 // set to 1 to disable concurrency
+    // concurrency = 50 // set to 1 to disable concurrency
     for (let i = 0; i < heights.length; i += concurrency) {
       chunks.push(heights.slice(i, i + concurrency))
     }
@@ -475,20 +475,25 @@ export class IndexerService {
   //     }
   // }
 
+  async addIndexToBlocks(): Promise<void> {
+    await this.blockRepository.query('CREATE INDEX IF NOT EXISTS idx_height ON block (height);');
+  }
+
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
     name: 'verification_trigger'
   })
-  triggerVerificationMode () {
+  triggerVerificationMode(): void {
     this.verificationMode = true
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS, {
+  @Cron(CronExpression.EVERY_5_MINUTES, {
     name: 'indexer_tasks'
   })
-  async indexBlockchainData () {
+  async indexBlockchainData(): Promise<void> {
     const job = this.schedulerRegistry.getCronJob('indexer_tasks')
     job.stop()
     this.verificationMode = false
+    await this.addIndexToBlocks()
     // add creds to axios post
     // axios.defaults.headers.common['Authorization'] = `Basic ${Buffer.from(CREDS).toString('base64')}`;
     const height = await this.getHeight()

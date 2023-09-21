@@ -8,20 +8,20 @@ import {
 @Entity('block')
 export class Block {
   @PrimaryGeneratedColumn()
-  id: number;
+    id: number;
 
   @Column('int')
-  height: number;
+    height: number;
 
   @Column('text')
-  proposer: string;
+    proposer: string;
 
   @Column('int')
-  relays: number;
+    relays: number;
 
   @Column('int')
-  txs: number;
+    txs: number;
 
   @CreateDateColumn()
-  timestamp: Date;
+    timestamp: Date;
 }

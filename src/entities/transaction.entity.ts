@@ -8,50 +8,50 @@ import {
 @Entity('transaction')
 export class Transaction {
   @PrimaryGeneratedColumn()
-  id: number;
+    id: number;
 
   @Column('int')
-  height: number;
+    height: number;
 
   @Column('text')
-  hash: string;
+    hash: string;
 
   @Column('int')
-  index: number;
+    index: number;
 
   @Column('int')
-  resultCode: number;
+    resultCode: number;
 
   @Column('text')
-  appPubKey: string;
+    appPubKey: string;
 
   @Column('text')
-  chain: string;
+    chain: string;
 
   @Column('text')
-  servicerPubKey: string;
+    servicerPubKey: string;
 
   @Column('text')
-  signer: string;
+    signer: string;
 
   @Column('text')
-  recipient: string;
+    recipient: string;
 
   @Column('text')
-  msgType: string;
+    msgType: string;
 
   @Column('int', { nullable: true })
-  totalProofs?: number;
+    totalProofs?: number;
 
   @Column('int')
-  fee: number;
+    fee: number;
 
   @Column('text')
-  memo: string;
+    memo: string;
 
   @Column('bigint')
-  amount: number;
+    amount: number;
 
   @CreateDateColumn()
-  timestamp: Date;
+    timestamp: Date;
 }

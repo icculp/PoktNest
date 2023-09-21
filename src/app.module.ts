@@ -7,8 +7,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Block } from './entities/block.entity';
 import { Transaction } from './entities/transaction.entity';
 import { IndexerService } from './indexer.service';
-import { BullModule } from '@nestjs/bull';
-import { BlockProcessor } from './block.processor';
+import { BullModule, getQueueToken } from '@nestjs/bull';
+import { BlockProcessor, BufferService } from './block.processor';
 
 require('dotenv').config();
 
@@ -33,12 +33,20 @@ require('dotenv').config();
       port: 6379,
     },
   }),
-  BullModule.registerQueue({
-    name: 'blockProcessing',
-  })
+  BullModule.registerQueue(
+    {
+      name: 'blockProcessing',
+    },
+    {
+      name: 'flushBlocksQueue',
+    },
+    {
+      name: 'flushTransactionsQueue',
+    },
+  ),
   ],
   controllers: [],
-  providers: [AppService, IndexerService, BlockProcessor],
+  providers: [AppService, IndexerService, BlockProcessor, BufferService],
 })
 
 export class AppModule {
